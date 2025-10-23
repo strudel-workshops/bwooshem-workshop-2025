@@ -5,6 +5,9 @@
   "type": "module",
   "homepage": "https://codytodonnell.github.io/strudel-kit/demo/",
   "scripts": {
+    "generate:files": "node scripts/generate-file-entities.js",
+    "predev": "npm run generate:files",
+    "prebuild": "npm run generate:files",
     "start": "vite",
     "dev": "vite",
     "build": "tsc && vite build",

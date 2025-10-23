@@ -6,6 +6,8 @@ export enum RunComputationActionType {
   SET_RESULTS_TABLE_DATA = 'SET_RESULTS_TABLE_DATA',
   SET_RESULTS_LINECHART_DATA = 'SET_RESULTS_LINECHART_DATA',
   SET_RESULTS_BARCHART_DATA = 'SET_RESULTS_BARCHART_DATA',
+  SET_INPUT_PARAMETERS = 'SET_INPUT_PARAMETERS',
+  SET_SELECTED_DATASET = 'SET_SELECTED_DATASET',
 }
 
 export interface RunComputationAction {
@@ -45,5 +47,20 @@ export const setResultsBarChartData = (
   data: RunComputationState['results']['barChart']['data']
 ): RunComputationAction => ({
   type: RunComputationActionType.SET_RESULTS_BARCHART_DATA,
+  payload: data,
+});
+
+export const setInputParameters = (data: {
+  hourlyLoadProfile: number[];
+  shiftPercentage: number;
+  shedHours: number;
+  loadUpHours: number;
+}): RunComputationAction => ({
+  type: RunComputationActionType.SET_INPUT_PARAMETERS,
+  payload: data,
+});
+
+export const setSelectedDataset = (data: string): RunComputationAction => ({
+  type: RunComputationActionType.SET_SELECTED_DATASET,
   payload: data,
 });

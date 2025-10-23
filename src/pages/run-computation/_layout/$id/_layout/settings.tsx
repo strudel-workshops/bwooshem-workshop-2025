@@ -4,6 +4,7 @@ import {
   Container,
   FormControl,
   Grid,
+  InputLabel,
   MenuItem,
   Paper,
   Select,
@@ -16,7 +17,10 @@ import {
 } from '@mui/material';
 import { useState } from 'react';
 import { AppLink } from '../../../../../components/AppLink';
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { useDataFromSource } from '../../../../../hooks/useDataFromSource';
+import { useRunComputation } from '../../../-context/ContextProvider';
+import { setSelectedDataset } from '../../../-context/actions';
 
 export const Route = createFileRoute(
   '/run-computation/_layout/$id/_layout/settings'
@@ -30,10 +34,31 @@ export const Route = createFileRoute(
  * `<RunningComputation>` component.
  */
 function SettingsPage() {
+  const { dispatch } = useRunComputation();
+  const navigate = useNavigate();
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [selectedDatasetLocal, setSelectedDatasetLocal] = useState('');
+
+  // Load available CSV files from file-entities.json
+  const fileEntities = useDataFromSource('dummy-data/file-entities.json');
+  const csvFiles = Array.isArray(fileEntities)
+    ? fileEntities.filter((file: any) => file.name)
+    : [];
 
   const handleAdvancedToggle = () => {
     setShowAdvanced(!showAdvanced);
+  };
+
+  const handleRunScenario = async () => {
+    try {
+      // Save selected dataset to context
+      dispatch(setSelectedDataset(selectedDatasetLocal));
+
+      // Navigate directly to results page (calculation will happen there)
+      navigate({ to: '/run-computation/$id/results', params: { id: 'new' } });
+    } catch (err) {
+      // Error handling could be added here
+    }
   };
 
   return (
@@ -95,28 +120,36 @@ function SettingsPage() {
               Optimization Settings
             </Typography>
             <Grid container rowSpacing={2} alignItems="center">
-              {/* CUSTOMIZE: settings form elements */}
               <Grid item md={3}>
                 <Typography>Solver</Typography>
               </Grid>
               <Grid item md={9}>
                 <FormControl fullWidth>
-                  <Select id="solver-select">
-                    <MenuItem value={10}>Solver 1</MenuItem>
-                    <MenuItem value={20}>Solver 2</MenuItem>
-                    <MenuItem value={30}>Solver 3</MenuItem>
+                  <Select id="solver-select" value="default" disabled>
+                    <MenuItem value="default">Default</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
               <Grid item md={3}>
-                <Typography>Objective</Typography>
+                <Typography>Price Dataset</Typography>
               </Grid>
               <Grid item md={9}>
                 <FormControl fullWidth>
-                  <Select id="objective-select">
-                    <MenuItem value={10}>Objective 1</MenuItem>
-                    <MenuItem value={20}>Objective 2</MenuItem>
-                    <MenuItem value={30}>Objective 3</MenuItem>
+                  <InputLabel id="dataset-select-label">
+                    Select Price Dataset
+                  </InputLabel>
+                  <Select
+                    labelId="dataset-select-label"
+                    id="dataset-select"
+                    value={selectedDatasetLocal}
+                    onChange={(e) => setSelectedDatasetLocal(e.target.value)}
+                    label="Select Price Dataset"
+                  >
+                    {csvFiles.map((file: any) => (
+                      <MenuItem key={file.name} value={file.name}>
+                        {file.name}.csv
+                      </MenuItem>
+                    ))}
                   </Select>
                 </FormControl>
               </Grid>
@@ -165,16 +198,15 @@ function SettingsPage() {
               </Grid>
             )}
             <Box textAlign="right">
-              <AppLink to="/run-computation/$id/running" params={{ id: 'new' }}>
-                {/* CUSTOMIZE: run button */}
-                <Button
-                  variant="contained"
-                  data-testid="rnc-run-button"
-                  sx={{ marginTop: 4 }}
-                >
-                  Run Scenario
-                </Button>
-              </AppLink>
+              <Button
+                variant="contained"
+                data-testid="rnc-run-button"
+                sx={{ marginTop: 4 }}
+                onClick={handleRunScenario}
+                disabled={!selectedDatasetLocal}
+              >
+                Run Scenario
+              </Button>
             </Box>
           </Stack>
         </Paper>

@@ -1,11 +1,7 @@
 import {
   Box,
   Button,
-  FormControl,
-  InputLabel,
-  MenuItem,
   Modal,
-  Select,
   Stack,
   TextField,
   Typography,
@@ -56,36 +52,22 @@ export const NewScenarioModal: React.FC<Props> = ({
         }}
       >
         <Typography id="modal-modal-title" variant="h6" component="h2">
-          {/* CUSTOMIZE: new item modal title */}
-          New Analysis Scenario
+          New Price Analysis Scenario
         </Typography>
-        {/* CUSTOMIZE: new item form components */}
-        <FormControl fullWidth>
-          <InputLabel id="analysis-type-select-label">Analysis Type</InputLabel>
-          <Select
-            labelId="analysis-type-select-label"
-            id="analysis-type-select"
-            label="Age"
-          >
-            <MenuItem value={10}>Analysis Type 1</MenuItem>
-            <MenuItem value={20}>Analysis Type 2</MenuItem>
-            <MenuItem value={30}>Analysis Type 3</MenuItem>
-          </Select>
-        </FormControl>
-        <FormControl fullWidth>
-          <InputLabel id="model-select-label">Model</InputLabel>
-          <Select labelId="model-select-label" id="model-select" label="Model">
-            <MenuItem value={10}>Model 1</MenuItem>
-            <MenuItem value={20}>Model 2</MenuItem>
-            <MenuItem value={30}>Model 3</MenuItem>
-          </Select>
-        </FormControl>
-        <TextField id="name-field" label="Scenario Name" variant="outlined" />
+        <TextField
+          id="name-field"
+          label="Scenario Name"
+          variant="outlined"
+          fullWidth
+          sx={{ mt: 2 }}
+        />
         <TextField
           id="description-field"
           label="Description"
           multiline
           rows={4}
+          fullWidth
+          sx={{ mt: 2 }}
         />
         <Box textAlign="right">
           <AppLink to="/run-computation/$id/data-inputs" params={{ id: 'new' }}>

@@ -2,26 +2,23 @@ import {
   Box,
   Button,
   Container,
-  Grid,
   Paper,
   Stack,
   Step,
   StepLabel,
   Stepper,
   Typography,
+  CircularProgress,
 } from '@mui/material';
-import { DataGrid } from '@mui/x-data-grid';
 import { createFileRoute } from '@tanstack/react-router';
-import { useEffect } from 'react';
-import Plot from 'react-plotly.js';
+import { useEffect, useState } from 'react';
 import { AppLink } from '../../../../../components/AppLink';
 import { useRunComputation } from '../../../-context/ContextProvider';
+import { setResultsTableData } from '../../../-context/actions';
 import {
-  setResultsBarChartData,
-  setResultsLineChartData,
-  setResultsTableData,
-} from '../../../-context/actions';
-import { useDataFromSource } from '../../../../../hooks/useDataFromSource';
+  calculateHourlyCosts,
+  calculateSummaryStats,
+} from '../../../-utils/calculations';
 
 export const Route = createFileRoute(
   '/run-computation/_layout/$id/_layout/results'
@@ -31,49 +28,85 @@ export const Route = createFileRoute(
 
 /**
  * Results page to display after a computation completes in the run-computation Task Flow.
- * Displays a line chart, bar chart, and table of results from the computation.
+ * Performs the calculation and displays a summary with total cost.
  */
 function ResultsPage() {
   const { state, dispatch } = useRunComputation();
-  // CUSTOMIZE: results table data source
-  const tableData = useDataFromSource('dummy-data/results_table.json');
-  // CUSTOMIZE: results line chart data source
-  const lineData = useDataFromSource('dummy-data/results_line_chart.json');
-  // CUSTOMIZE: results bar chart data source
-  const barData = useDataFromSource('dummy-data/results_bar_chart.json');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [summary, setSummary] = useState<any>(null);
 
   /**
-   * Set data for the results table when the data loads
+   * Perform the calculation when the component mounts
    */
   useEffect(() => {
-    if (!state.results.table.data || state.results.table.data.length === 0) {
-      dispatch(setResultsTableData(tableData));
-    }
-  }, [tableData]);
+    const runCalculation = async () => {
+      try {
+        setLoading(true);
 
-  /**
-   * Set data for the results line chart when the data loads
-   */
-  useEffect(() => {
-    if (
-      !state.results.lineChart.data ||
-      state.results.lineChart.data.length === 0
-    ) {
-      dispatch(setResultsLineChartData(lineData));
-    }
-  }, [lineData]);
+        // Get input parameters and selected dataset from context
+        const { inputParameters, selectedDataset } = state;
 
-  /**
-   * Set data for the results bar chart when the data loads
-   */
-  useEffect(() => {
-    if (
-      !state.results.barChart.data ||
-      state.results.barChart.data.length === 0
-    ) {
-      dispatch(setResultsBarChartData(barData));
-    }
-  }, [barData]);
+        if (!inputParameters || !selectedDataset) {
+          setError(
+            'Missing input parameters or dataset selection. Please go back and complete the form.'
+          );
+          setLoading(false);
+          return;
+        }
+
+        // Load the CSV data - try the public data directory path
+        const csvPath = `/data/${selectedDataset}.csv`;
+
+        const response = await fetch(csvPath);
+
+        if (!response.ok) {
+          throw new Error(
+            `Failed to load CSV file: ${response.status} ${response.statusText}`
+          );
+        }
+
+        const csvText = await response.text();
+
+        // Parse CSV (format: datetime, Price ($/kWh), cld, mec, mgcc, fixed cost)
+        const lines = csvText.split('\n').slice(1); // Skip header
+        const priceData = lines
+          .filter((line) => line.trim())
+          .map((line) => {
+            const columns = line.split(',');
+            // First column is datetime, second column is Price ($/kWh)
+            return {
+              datetime: columns[0].trim(),
+              price: parseFloat(columns[1].trim()),
+            };
+          });
+
+        if (priceData.length === 0) {
+          throw new Error('No data found in CSV file');
+        }
+
+        // Perform calculation
+        const results = calculateHourlyCosts(
+          priceData,
+          inputParameters.hourlyLoadProfile
+        );
+
+        // Calculate summary statistics
+        const stats = calculateSummaryStats(results);
+        setSummary(stats);
+
+        // Store results in context
+        dispatch(setResultsTableData(results));
+
+        setLoading(false);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Calculation failed');
+        setLoading(false);
+      }
+    };
+
+    runCalculation();
+  }, []);
 
   return (
     <Stack spacing={0} flex={1}>
@@ -179,34 +212,81 @@ function ResultsPage() {
         </Stack>
         <Box flex={1}>
           <Container
-            maxWidth="xl"
+            maxWidth="md"
             sx={{
               mt: 4,
             }}
           >
-            <Grid container spacing={4}>
-              <Grid item sm={6}>
-                <Paper>
-                  <Plot data={state.results.lineChart.data} layout={{}} />
-                </Paper>
-              </Grid>
-              <Grid item sm={6}>
-                <Paper>
-                  <Plot data={state.results.barChart.data} layout={{}} />
-                </Paper>
-              </Grid>
-              <Grid item xs={12}>
-                <Paper>
-                  <DataGrid
-                    rows={state.results.table.data || []}
-                    getRowId={(row) => row[state.results.table.dataIdField]}
-                    columns={state.results.table.columns}
-                    disableColumnSelector
-                    disableRowSelectionOnClick
-                  />
-                </Paper>
-              </Grid>
-            </Grid>
+            <Paper sx={{ padding: 4 }}>
+              {loading && (
+                <Stack alignItems="center" spacing={2}>
+                  <CircularProgress />
+                  <Typography>Calculating results...</Typography>
+                </Stack>
+              )}
+
+              {error && (
+                <Stack spacing={2}>
+                  <Typography color="error" variant="h6">
+                    Error
+                  </Typography>
+                  <Typography color="error">{error}</Typography>
+                  <AppLink
+                    to="/run-computation/$id/settings"
+                    params={{ id: 'new' }}
+                  >
+                    <Button variant="contained">Back to Settings</Button>
+                  </AppLink>
+                </Stack>
+              )}
+
+              {!loading && !error && summary && (
+                <Stack spacing={3}>
+                  <Typography variant="h5" component="h2" fontWeight="bold">
+                    Calculation Summary
+                  </Typography>
+
+                  <Stack spacing={2}>
+                    <Stack
+                      direction="row"
+                      justifyContent="space-between"
+                      alignItems="center"
+                    >
+                      <Typography variant="h6">Total Cost:</Typography>
+                      <Typography
+                        variant="h4"
+                        color="primary"
+                        fontWeight="bold"
+                      >
+                        ${summary.totalCost}
+                      </Typography>
+                    </Stack>
+
+                    <Stack direction="row" justifyContent="space-between">
+                      <Typography fontWeight="bold">
+                        Average Cost per Hour:
+                      </Typography>
+                      <Typography>${summary.averageCost}</Typography>
+                    </Stack>
+
+                    <Stack direction="row" justifyContent="space-between">
+                      <Typography fontWeight="bold">Total Load:</Typography>
+                      <Typography>{summary.totalLoad} kW</Typography>
+                    </Stack>
+
+                    <Stack direction="row" justifyContent="space-between">
+                      <Typography fontWeight="bold">Average Load:</Typography>
+                      <Typography>{summary.averageLoad} kW</Typography>
+                    </Stack>
+
+                    <Stack direction="row" justifyContent="space-between">
+                      <Typography fontWeight="bold">Data Points:</Typography>
+                      <Typography>{summary.dataPoints}</Typography>
+                    </Stack>
+                  </Stack>
+                </Stack>
+              )}
+            </Paper>
           </Container>
         </Box>
       </Stack>
@@ -222,7 +302,6 @@ function ResultsPage() {
         }}
       >
         <AppLink to="/run-computation/$id/settings" params={{ id: 'new' }}>
-          {/* CUSTOMIZE: back to settings button */}
           <Button variant="contained">Back to Optimization Settings</Button>
         </AppLink>
       </Box>

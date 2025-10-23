@@ -30,6 +30,13 @@ export interface RunComputationState {
     };
   };
   selectedItem?: any;
+  inputParameters?: {
+    hourlyLoadProfile: number[];
+    shiftPercentage: number;
+    shedHours: number;
+    loadUpHours: number;
+  };
+  selectedDataset?: string;
 }
 
 /**
@@ -167,6 +174,18 @@ function runComputationReducer(
             data: action.payload,
           },
         },
+      };
+    }
+    case RunComputationActionType.SET_INPUT_PARAMETERS: {
+      return {
+        ...state,
+        inputParameters: action.payload,
+      };
+    }
+    case RunComputationActionType.SET_SELECTED_DATASET: {
+      return {
+        ...state,
+        selectedDataset: action.payload,
       };
     }
     default: {

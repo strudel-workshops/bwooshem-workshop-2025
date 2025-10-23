@@ -15,7 +15,8 @@
     "!.stylelintrc.json",
     "*.md",
     "*.css",
-    "dist"
+    "dist",
+    "scripts"
   ],
   "extends": ["airbnb-typescript", "plugin:prettier/recommended"],
   "plugins": ["@typescript-eslint", "import", "react", "prettier"],
@@ -40,5 +41,21 @@
     "node": true,
     "browser": true,
     "amd": true
-  }
+  },
+  "overrides": [
+    {
+      "files": ["scripts/**/*.js"],
+      "extends": ["airbnb-base", "plugin:prettier/recommended"],
+      "parser": "espree",
+      "parserOptions": {
+        "ecmaVersion": 2020,
+        "sourceType": "script"
+      },
+      "rules": {
+        "@typescript-eslint/no-var-requires": "off",
+        "@typescript-eslint/naming-convention": "off",
+        "import/no-extraneous-dependencies": "off"
+      }
+    }
+  ]
 }

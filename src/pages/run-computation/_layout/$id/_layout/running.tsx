@@ -13,6 +13,9 @@ import {
 import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { AppLink } from '../../../../../components/AppLink';
+import { useRunComputation } from '../../../-context/ContextProvider';
+import { setResultsTableData } from '../../../-context/actions';
+import { calculateHourlyCosts } from '../../../-utils/calculations';
 
 export const Route = createFileRoute(
   '/run-computation/_layout/$id/_layout/running'
@@ -25,16 +28,59 @@ export const Route = createFileRoute(
  * Continuing after completion, this page takes users to the `<Results>` page.
  */
 function RunningComputationPage() {
+  const { state, dispatch } = useRunComputation();
   const [running, setRunning] = useState(true);
 
   /**
-   * Simulate the time it takes to run the optimization
+   * Perform the calculation when the component mounts
    */
   useEffect(() => {
-    setTimeout(() => {
-      setRunning(false);
-    }, 2000);
-  });
+    const runCalculation = async () => {
+      try {
+        // Get input parameters and selected dataset from context
+        const { inputParameters, selectedDataset } = state;
+
+        if (!inputParameters || !selectedDataset) {
+          setRunning(false);
+          return;
+        }
+
+        // Load the CSV data
+        const response = await fetch(`/data/${selectedDataset}.csv`);
+        const csvText = await response.text();
+
+        // Parse CSV (simple parsing - assumes format from explore-data)
+        const lines = csvText.split('\n').slice(1); // Skip header
+        const priceData = lines
+          .filter((line) => line.trim())
+          .map((line) => {
+            const [datetime, price] = line.split(',');
+            return {
+              datetime: datetime.trim(),
+              price: parseFloat(price.trim()),
+            };
+          });
+
+        // Perform calculation
+        const results = calculateHourlyCosts(
+          priceData,
+          inputParameters.hourlyLoadProfile
+        );
+
+        // Store results in context
+        dispatch(setResultsTableData(results));
+
+        // Simulate processing time
+        setTimeout(() => {
+          setRunning(false);
+        }, 1000);
+      } catch (err) {
+        setRunning(false);
+      }
+    };
+
+    runCalculation();
+  }, []);
 
   return (
     <Stack spacing={0} flex={1}>
