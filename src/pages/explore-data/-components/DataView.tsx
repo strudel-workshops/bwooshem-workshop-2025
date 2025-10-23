@@ -1,11 +1,12 @@
 import { Alert, Box, LinearProgress, Skeleton } from '@mui/material';
-import { GridPaginationModel } from '@mui/x-data-grid';
+import { GridPaginationModel, GridColDef } from '@mui/x-data-grid';
 import React, { useState } from 'react';
 import { useFilters } from '../../../components/FilterContext';
 import { SciDataGrid } from '../../../components/SciDataGrid';
 import { filterData } from '../../../utils/filters.utils';
 import { useListQuery } from '../../../hooks/useListQuery';
 import { FilterConfig } from '../../../types/filters.types';
+import { AppLink } from '../../../components/AppLink';
 
 interface DataViewProps {
   filterConfigs: FilterConfig[];
@@ -25,13 +26,13 @@ export const DataView: React.FC<DataViewProps> = ({
   const [pageSize, setPageSize] = useState(25);
   const [offset, setOffest] = useState(page * pageSize);
   // CUSTOMIZE: the unique ID field for the data source
-  const dataIdField = 'Id';
+  const dataIdField = 'name';
   // CUSTOMIZE: query mode, 'client' or 'server'
   const queryMode = 'client';
   const { isPending, isFetching, isError, data, error } = useListQuery({
     activeFilters,
     // CUSTOMIZE: the table data source
-    dataSource: 'dummy-data/exoplanets.csv',
+    dataSource: 'dummy-data/file-entities.json',
     filterConfigs,
     offset,
     page,
@@ -76,6 +77,25 @@ export const DataView: React.FC<DataViewProps> = ({
     return <Alert severity="error">{error.message}</Alert>;
   }
 
+  // Define columns with custom rendering for the name field
+  const columns: GridColDef[] = [
+    {
+      field: 'name',
+      headerName: 'Name',
+      width: 300,
+      renderCell: (params) => (
+        <AppLink to="/explore-data/$id" params={{ id: params.value }}>
+          {params.value}.csv
+        </AppLink>
+      ),
+    },
+    {
+      field: 'average',
+      headerName: 'Average',
+      width: 200,
+    },
+  ];
+
   // Show the data when the query completes
   return (
     <>
@@ -87,43 +107,7 @@ export const DataView: React.FC<DataViewProps> = ({
         onPaginationModelChange={handlePaginationModelChange}
         getRowId={(row) => row[dataIdField]}
         // CUSTOMIZE: the table columns
-        columns={[
-          {
-            field: 'Planet Name',
-            headerName: 'Planet Name',
-            width: 200,
-          },
-          {
-            field: 'Planet Host',
-            headerName: 'Planet Host',
-            width: 200,
-          },
-          {
-            field: 'Discovery Method',
-            headerName: 'Discovery Method',
-            width: 200,
-          },
-          {
-            field: 'Orbital Period Days',
-            headerName: 'Orbital Period',
-            units: 'days',
-            type: 'number',
-            width: 200,
-          },
-          {
-            field: 'Mass',
-            headerName: 'Mass',
-            units: 'Earth Mass',
-            type: 'number',
-            width: 200,
-          },
-          {
-            field: 'Eccentricity',
-            headerName: 'Eccentricity',
-            type: 'number',
-            width: 200,
-          },
-        ]}
+        columns={columns}
         disableColumnSelector
         autoHeight
         initialState={{

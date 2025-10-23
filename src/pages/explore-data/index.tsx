@@ -14,56 +14,7 @@ export const Route = createFileRoute('/explore-data/')({
 });
 
 // CUSTOMIZE: the filter definitions
-const filterConfigs: FilterConfig[] = [
-  {
-    field: 'Discovery Method',
-    label: 'Discovery Method',
-    operator: 'contains-one-of',
-    filterComponent: 'CheckboxList',
-    filterProps: {
-      options: [
-        {
-          label: 'Astrometry',
-          value: 'Astrometry',
-        },
-        {
-          label: 'Disk Kinematics',
-          value: 'Disk Kinematics',
-        },
-        {
-          label: 'Eclipse Timing Variations',
-          value: 'Eclipse Timing Variations',
-        },
-        {
-          label: 'Imaging',
-          value: 'Imaging',
-        },
-        {
-          label: 'Microlensing',
-          value: 'Microlensing',
-        },
-        {
-          label: 'Radial Velocity',
-          value: 'Radial Velocity',
-        },
-        {
-          label: 'Transit',
-          value: 'Transit',
-        },
-      ],
-    },
-  },
-  {
-    field: 'Mass',
-    label: 'Mass',
-    operator: 'between-inclusive',
-    filterComponent: 'RangeSlider',
-    filterProps: {
-      min: 0,
-      max: 10000,
-    },
-  },
-];
+const filterConfigs: FilterConfig[] = [];
 
 /**
  * Main explorer page in the explore-data Task Flow.

@@ -9,42 +9,9 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { LabelValueTable } from '../../../components/LabelValueTable';
-import { DataGrid } from '@mui/x-data-grid';
 import { AppLink } from '../../../components/AppLink';
-
-/**
- * Placeholder columns for related data table
- */
-const relatedColumns = [
-  {
-    field: 'id',
-    headerName: 'ID',
-    width: 50,
-  },
-  {
-    field: 'attr1',
-    headerName: 'Attribute 1',
-    width: 100,
-  },
-  {
-    field: 'attr2',
-    headerName: 'Attribute 2',
-    width: 100,
-  },
-  {
-    field: 'attr3',
-    headerName: 'Attribute 3',
-    width: 100,
-  },
-];
-
-/**
- * Placeholder rows for related data table
- */
-const emptyRows = Array(25).fill(0);
-const relatedRows = emptyRows.map((d, i) => {
-  return { id: i, attr1: 'value', attr2: 'value', attr3: 'value' };
-});
+import { useCSVStatistics } from '../../../hooks/useCSVStatistics';
+import Plot from 'react-plotly.js';
 
 interface PreviewPanelProps {
   /**
@@ -65,6 +32,8 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
   previewItem,
   onClose,
 }) => {
+  const { stats, data, loading, error } = useCSVStatistics(previewItem.name);
+
   return (
     <Paper
       elevation={0}
@@ -77,8 +46,8 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
         <Stack spacing={1}>
           <Stack direction="row">
             <Typography variant="h6" component="h3" flex={1}>
-              <AppLink to="/explore-data/$id" params={{ id: previewItem.Id }}>
-                {previewItem['Planet Name']}
+              <AppLink to="/explore-data/$id" params={{ id: previewItem.name }}>
+                {previewItem.name}.csv
               </AppLink>
             </Typography>
             <IconButton size="small" onClick={onClose}>
@@ -86,50 +55,78 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
             </IconButton>
           </Stack>
           <Typography variant="body2">
-            Row description, subtitle, or helper text.
+            CSV file statistics for Price ($/kWh) column
           </Typography>
         </Stack>
-        <Box>
-          <Typography fontWeight="medium" mb={1}>
-            Property Group 1
-          </Typography>
-          <LabelValueTable
-            rows={[
-              { label: 'Property 1', value: 'value' },
-              { label: 'Property 2', value: 'value' },
-              { label: 'Property 3', value: 'value' },
-            ]}
-          />
-        </Box>
-        <Box>
-          <Typography fontWeight="medium" mb={1}>
-            Property Group 2
-          </Typography>
-          <LabelValueTable
-            rows={[
-              { label: 'Property 4', value: 'value' },
-              { label: 'Property 5', value: 'value' },
-            ]}
-          />
-        </Box>
-        <Box>
-          <Typography fontWeight="medium" mb={1}>
-            Related Data
-          </Typography>
-          <DataGrid
-            rows={relatedRows}
-            columns={relatedColumns}
-            disableRowSelectionOnClick
-            initialState={{
-              pagination: { paginationModel: { pageSize: 5 } },
-            }}
-          />
-        </Box>
+        {loading && (
+          <Box>
+            <Typography>Loading statistics...</Typography>
+          </Box>
+        )}
+        {error && (
+          <Box>
+            <Typography color="error">Error: {error}</Typography>
+          </Box>
+        )}
+        {stats && (
+          <>
+            <Box>
+              <Typography fontWeight="medium" mb={1}>
+                Price Statistics
+              </Typography>
+              <LabelValueTable
+                rows={[
+                  {
+                    label: 'Number of datapoints',
+                    value: stats.count.toLocaleString(),
+                  },
+                  {
+                    label: 'Average Price ($/kWh)',
+                    value: `$${stats.average}`,
+                  },
+                  { label: 'Median Price ($/kWh)', value: `$${stats.median}` },
+                  { label: 'Maximum Price ($/kWh)', value: `$${stats.max}` },
+                  { label: 'Minimum Price ($/kWh)', value: `$${stats.min}` },
+                ]}
+              />
+            </Box>
+            <Box>
+              <Typography fontWeight="medium" mb={1}>
+                Price Over Time
+              </Typography>
+              <Plot
+                data={[
+                  {
+                    x: data.map((d) => d.datetime),
+                    y: data.map((d) => d.price),
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Price ($/kWh)',
+                    line: { color: '#1976d2' },
+                  },
+                ]}
+                layout={{
+                  autosize: true,
+                  margin: { l: 50, r: 20, t: 20, b: 50 },
+                  xaxis: {
+                    title: 'Date/Time',
+                    tickangle: -45,
+                  },
+                  yaxis: {
+                    title: 'Price ($/kWh)',
+                  },
+                  showlegend: false,
+                }}
+                style={{ width: '100%', height: '300px' }}
+                config={{ responsive: true }}
+              />
+            </Box>
+          </>
+        )}
         <Stack direction="row">
-          <AppLink to="/explore-data/$id" params={{ id: previewItem.Id }}>
+          <AppLink to="/explore-data/$id" params={{ id: previewItem.name }}>
             <Button variant="contained">View details</Button>
           </AppLink>
-          <Button variant="outlined">Export data</Button>
         </Stack>
       </Stack>
     </Paper>
