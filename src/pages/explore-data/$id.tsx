@@ -1,5 +1,22 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { Box, Container, Paper, Stack, Typography } from '@mui/material';
+import { useState } from 'react';
+import {
+  Box,
+  Container,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Paper,
+  Select,
+  Stack,
+  Typography,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+} from '@mui/material';
 import { PageHeader } from '../../components/PageHeader';
 import { useDetailQuery } from '../../hooks/useDetailQuery';
 import { useCSVStatistics } from '../../hooks/useCSVStatistics';
@@ -53,7 +70,11 @@ function DataDetailPage() {
  * Component to load and display statistics for a CSV file
  */
 function CSVStatistics({ filename }: { filename: string }) {
-  const { stats, data, loading, error } = useCSVStatistics(filename);
+  const { stats, data, monthlyStats, hourlyProfile, loading, error } =
+    useCSVStatistics(filename);
+  const [hourlyMetric, setHourlyMetric] = useState<'average' | 'median'>(
+    'average'
+  );
 
   if (!filename) {
     return (
@@ -116,6 +137,113 @@ function CSVStatistics({ filename }: { filename: string }) {
               <Typography>${stats.min}</Typography>
             </Stack>
           </Stack>
+        </Stack>
+      </Paper>
+      <Paper sx={{ padding: 2 }}>
+        <Stack spacing={2}>
+          <Typography variant="h6" fontWeight="bold">
+            Monthly Statistics
+          </Typography>
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>
+                    <strong>Month</strong>
+                  </TableCell>
+                  <TableCell align="right">
+                    <strong>Average ($/kWh)</strong>
+                  </TableCell>
+                  <TableCell align="right">
+                    <strong>Median ($/kWh)</strong>
+                  </TableCell>
+                  <TableCell align="right">
+                    <strong>Max ($/kWh)</strong>
+                  </TableCell>
+                  <TableCell align="right">
+                    <strong>Min ($/kWh)</strong>
+                  </TableCell>
+                  <TableCell align="right">
+                    <strong>Data Points</strong>
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {monthlyStats.map((monthStat) => (
+                  <TableRow key={monthStat.month} hover>
+                    <TableCell>{monthStat.month}</TableCell>
+                    <TableCell align="right">${monthStat.average}</TableCell>
+                    <TableCell align="right">${monthStat.median}</TableCell>
+                    <TableCell align="right">${monthStat.max}</TableCell>
+                    <TableCell align="right">${monthStat.min}</TableCell>
+                    <TableCell align="right">
+                      {monthStat.count.toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Stack>
+      </Paper>
+      <Paper sx={{ padding: 2 }}>
+        <Stack spacing={2}>
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
+          >
+            <Typography variant="h6" fontWeight="bold">
+              Typical Daily Profile
+            </Typography>
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <InputLabel id="hourly-metric-label">Metric</InputLabel>
+              <Select
+                labelId="hourly-metric-label"
+                id="hourly-metric-select"
+                value={hourlyMetric}
+                label="Metric"
+                onChange={(e) =>
+                  setHourlyMetric(e.target.value as 'average' | 'median')
+                }
+              >
+                <MenuItem value="average">Average</MenuItem>
+                <MenuItem value="median">Median</MenuItem>
+              </Select>
+            </FormControl>
+          </Stack>
+          <Plot
+            data={[
+              {
+                x: hourlyProfile.map((h) => h.hour),
+                y: hourlyProfile.map((h) =>
+                  hourlyMetric === 'average' ? h.averagePrice : h.medianPrice
+                ),
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: `${hourlyMetric === 'average' ? 'Average' : 'Median'} Price`,
+                line: { color: '#2e7d32', width: 2 },
+                marker: { size: 6 },
+              },
+            ]}
+            layout={{
+              autosize: true,
+              margin: { l: 60, r: 40, t: 20, b: 60 },
+              xaxis: {
+                title: 'Hour of Day',
+                tickmode: 'linear',
+                tick0: 0,
+                dtick: 2,
+                range: [-0.5, 23.5],
+              },
+              yaxis: {
+                title: `${hourlyMetric === 'average' ? 'Average' : 'Median'} Price ($/kWh)`,
+              },
+              showlegend: false,
+            }}
+            style={{ width: '100%', height: '400px' }}
+            config={{ responsive: true }}
+          />
         </Stack>
       </Paper>
       <Paper sx={{ padding: 2 }}>

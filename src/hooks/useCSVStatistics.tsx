@@ -10,6 +10,21 @@ interface CSVStatistics {
   min: number;
 }
 
+interface MonthlyStatistics {
+  month: string;
+  average: number;
+  median: number;
+  max: number;
+  min: number;
+  count: number;
+}
+
+interface HourlyProfile {
+  hour: number;
+  averagePrice: number;
+  medianPrice: number;
+}
+
 interface CSVDataPoint {
   datetime: string;
   price: number;
@@ -18,6 +33,8 @@ interface CSVDataPoint {
 interface UseCSVStatisticsResult {
   stats: CSVStatistics | null;
   data: CSVDataPoint[];
+  monthlyStats: MonthlyStatistics[];
+  hourlyProfile: HourlyProfile[];
   loading: boolean;
   error: string | null;
 }
@@ -28,6 +45,8 @@ interface UseCSVStatisticsResult {
 export function useCSVStatistics(filename: string): UseCSVStatisticsResult {
   const [stats, setStats] = useState<CSVStatistics | null>(null);
   const [data, setData] = useState<CSVDataPoint[]>([]);
+  const [monthlyStats, setMonthlyStats] = useState<MonthlyStatistics[]>([]);
+  const [hourlyProfile, setHourlyProfile] = useState<HourlyProfile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,6 +54,8 @@ export function useCSVStatistics(filename: string): UseCSVStatisticsResult {
     if (!filename) {
       setStats(null);
       setData([]);
+      setMonthlyStats([]);
+      setHourlyProfile([]);
       setLoading(false);
       setError(null);
       return;
@@ -104,12 +125,122 @@ export function useCSVStatistics(filename: string): UseCSVStatisticsResult {
           max: Math.round(max * 10000) / 10000,
           min: Math.round(min * 10000) / 10000,
         });
+
+        // Calculate monthly statistics
+        const monthlyData: { [key: string]: number[] } = {};
+
+        dataPoints.forEach((point) => {
+          // Extract year-month from datetime string (format: "2024-12-01 00:00:00-08:00")
+          const dateStr = point.datetime.split(' ')[0]; // "2024-12-01"
+          const yearMonth = dateStr.substring(0, 7); // "2024-12"
+
+          if (!monthlyData[yearMonth]) {
+            monthlyData[yearMonth] = [];
+          }
+          monthlyData[yearMonth].push(point.price);
+        });
+
+        // Calculate statistics for each month
+        const monthlyStatsArray: MonthlyStatistics[] = Object.keys(monthlyData)
+          .sort()
+          .map((yearMonth) => {
+            const monthPrices = monthlyData[yearMonth];
+            const monthCount = monthPrices.length;
+            const monthSum = monthPrices.reduce((acc, val) => acc + val, 0);
+            const monthAverage = monthSum / monthCount;
+            const sortedMonthPrices = [...monthPrices].sort((a, b) => a - b);
+            const monthMedian =
+              monthCount % 2 === 0
+                ? (sortedMonthPrices[monthCount / 2 - 1] +
+                    sortedMonthPrices[monthCount / 2]) /
+                  2
+                : sortedMonthPrices[Math.floor(monthCount / 2)];
+            const monthMax = Math.max(...monthPrices);
+            const monthMin = Math.min(...monthPrices);
+
+            // Format month as "December 2024" for display
+            const [year, month] = yearMonth.split('-');
+            const monthNames = [
+              'January',
+              'February',
+              'March',
+              'April',
+              'May',
+              'June',
+              'July',
+              'August',
+              'September',
+              'October',
+              'November',
+              'December',
+            ];
+            const monthName = monthNames[parseInt(month, 10) - 1];
+
+            return {
+              month: `${monthName} ${year}`,
+              average: Math.round(monthAverage * 10000) / 10000,
+              median: Math.round(monthMedian * 10000) / 10000,
+              max: Math.round(monthMax * 10000) / 10000,
+              min: Math.round(monthMin * 10000) / 10000,
+              count: monthCount,
+            };
+          });
+
+        setMonthlyStats(monthlyStatsArray);
+
+        // Calculate hourly profile (average price for each hour of the day)
+        const hourlyData: { [hour: number]: number[] } = {};
+
+        dataPoints.forEach((point) => {
+          // Extract hour from datetime string (format: "2024-12-01 00:00:00-08:00")
+          const timeStr = point.datetime.split(' ')[1]; // "00:00:00-08:00"
+          const hour = parseInt(timeStr.split(':')[0], 10); // 0
+
+          if (!hourlyData[hour]) {
+            hourlyData[hour] = [];
+          }
+          hourlyData[hour].push(point.price);
+        });
+
+        // Calculate average and median price for each hour
+        const hourlyProfileArray: HourlyProfile[] = Array.from(
+          { length: 24 },
+          (_, hour) => {
+            const hourPrices = hourlyData[hour] || [];
+            const averagePrice =
+              hourPrices.length > 0
+                ? hourPrices.reduce((acc, val) => acc + val, 0) /
+                  hourPrices.length
+                : 0;
+
+            let medianPrice = 0;
+            if (hourPrices.length > 0) {
+              const sortedHourPrices = [...hourPrices].sort((a, b) => a - b);
+              medianPrice =
+                hourPrices.length % 2 === 0
+                  ? (sortedHourPrices[hourPrices.length / 2 - 1] +
+                      sortedHourPrices[hourPrices.length / 2]) /
+                    2
+                  : sortedHourPrices[Math.floor(hourPrices.length / 2)];
+            }
+
+            return {
+              hour,
+              averagePrice: Math.round(averagePrice * 10000) / 10000,
+              medianPrice: Math.round(medianPrice * 10000) / 10000,
+            };
+          }
+        );
+
+        setHourlyProfile(hourlyProfileArray);
       } catch (err) {
         setError(
           err instanceof Error ? err.message : 'Failed to load CSV data'
         );
         setStats(null);
         setData([]);
+        setMonthlyStats([]);
+        setHourlyProfile([]);
       } finally {
         setLoading(false);
       }
@@ -118,5 +249,5 @@ export function useCSVStatistics(filename: string): UseCSVStatisticsResult {
     loadCSVData();
   }, [filename]);
 
-  return { stats, data, loading, error };
+  return { stats, data, monthlyStats, hourlyProfile, loading, error };
 }

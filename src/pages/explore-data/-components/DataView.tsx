@@ -1,12 +1,14 @@
 import { Alert, Box, LinearProgress, Skeleton } from '@mui/material';
 import { GridPaginationModel, GridColDef } from '@mui/x-data-grid';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useFilters } from '../../../components/FilterContext';
 import { SciDataGrid } from '../../../components/SciDataGrid';
 import { filterData } from '../../../utils/filters.utils';
 import { useListQuery } from '../../../hooks/useListQuery';
 import { FilterConfig } from '../../../types/filters.types';
 import { AppLink } from '../../../components/AppLink';
+import { csv } from 'd3-fetch';
+import { cleanPath } from '../../../utils/queryParams.utils';
 
 interface DataViewProps {
   filterConfigs: FilterConfig[];
@@ -25,6 +27,8 @@ export const DataView: React.FC<DataViewProps> = ({
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [offset, setOffest] = useState(page * pageSize);
+  const [averages, setAverages] = useState<Record<string, number>>({});
+  const [loadingAverages, setLoadingAverages] = useState(false);
   // CUSTOMIZE: the unique ID field for the data source
   const dataIdField = 'name';
   // CUSTOMIZE: query mode, 'client' or 'server'
@@ -40,6 +44,55 @@ export const DataView: React.FC<DataViewProps> = ({
     queryMode,
     staticParams: null,
   });
+
+  // Load CSV statistics for all files to calculate averages
+  useEffect(() => {
+    if (!data || data.length === 0) return;
+
+    const loadAverages = async () => {
+      setLoadingAverages(true);
+      const base = document.querySelector('base')?.getAttribute('href') ?? '';
+      const basePath = import.meta.env.VITE_BASE_URL || '';
+      const leadingSlash = basePath ? '/' : '';
+      const basename = cleanPath(leadingSlash + base + basePath);
+
+      const newAverages: Record<string, number> = {};
+
+      await Promise.all(
+        data.map(async (entity: any) => {
+          try {
+            const dataPath = `${basename}/data/${entity.name}.csv`;
+            const csvData = await csv(dataPath);
+
+            if (csvData && csvData.length > 0) {
+              const priceColumn = Object.keys(csvData[0])[1]; // Second column "Price ($/kWh)"
+              const prices: number[] = [];
+
+              csvData.forEach((row) => {
+                const price = parseFloat(row[priceColumn]);
+                if (!isNaN(price)) {
+                  prices.push(price);
+                }
+              });
+
+              if (prices.length > 0) {
+                const sum = prices.reduce((acc, val) => acc + val, 0);
+                const average = sum / prices.length;
+                newAverages[entity.name] = Math.round(average * 10000) / 10000;
+              }
+            }
+          } catch (err) {
+            // Silently ignore errors when loading CSV files
+          }
+        })
+      );
+
+      setAverages(newAverages);
+      setLoadingAverages(false);
+    };
+
+    loadAverages();
+  }, [data]);
 
   const handleRowClick = (rowData: any) => {
     setPreviewItem(rowData.row);
@@ -93,13 +146,18 @@ export const DataView: React.FC<DataViewProps> = ({
       field: 'average',
       headerName: 'Average',
       width: 200,
+      valueGetter: (value, row) => {
+        return averages[row.name] !== undefined ? averages[row.name] : '';
+      },
     },
   ];
 
   // Show the data when the query completes
   return (
     <>
-      {isFetching && <LinearProgress variant="indeterminate" />}
+      {(isFetching || loadingAverages) && (
+        <LinearProgress variant="indeterminate" />
+      )}
       <SciDataGrid
         rows={filterData(data, activeFilters, filterConfigs, searchTerm)}
         pagination
