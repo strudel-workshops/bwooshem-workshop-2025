@@ -1,7 +1,8 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import {
   Box,
+  Button,
   Container,
   FormControl,
   InputLabel,
@@ -17,6 +18,7 @@ import {
   TableHead,
   TableRow,
 } from '@mui/material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { PageHeader } from '../../components/PageHeader';
 import { useDetailQuery } from '../../hooks/useDetailQuery';
 import { useCSVStatistics } from '../../hooks/useCSVStatistics';
@@ -32,6 +34,7 @@ export const Route = createFileRoute('/explore-data/$id')({
  */
 function DataDetailPage() {
   const { id } = Route.useParams();
+  const navigate = useNavigate();
 
   // Define query for this page and fetch data item
   const { data } = useDetailQuery({
@@ -52,6 +55,15 @@ function DataDetailPage() {
         pageTitle={data ? `${data.name}.csv` : ''}
         // CUSTOMIZE: breadcrumb title text
         breadcrumbTitle="File Detail"
+        actions={
+          <Button
+            variant="outlined"
+            startIcon={<ArrowBackIcon />}
+            onClick={() => navigate({ to: '/explore-data' })}
+          >
+            Back to Files
+          </Button>
+        }
         sx={{
           marginBottom: 1,
           padding: 2,
@@ -90,6 +102,7 @@ function CSVStatistics({ filename }: { filename: string }) {
     'all' | 'weekday' | 'weekend'
   >('all');
   const [selectedCity, setSelectedCity] = useState<string>('San Jose');
+  const [xAxisRange, setXAxisRange] = useState<[string, string] | null>(null);
 
   // Extract date range from CSV data
   const dateRange =
@@ -99,6 +112,29 @@ function CSVStatistics({ filename }: { filename: string }) {
           endDate: data[data.length - 1].datetime.split(' ')[0],
         }
       : null;
+
+  // Handler for synchronized zoom/pan on time-series charts
+  const handleRelayout = (event: any) => {
+    if (event['xaxis.range[0]'] && event['xaxis.range[1]']) {
+      const newRange: [string, string] = [
+        event['xaxis.range[0]'],
+        event['xaxis.range[1]'],
+      ];
+      // Only update if the range has actually changed to prevent unnecessary re-renders
+      setXAxisRange((prevRange) => {
+        if (
+          !prevRange ||
+          prevRange[0] !== newRange[0] ||
+          prevRange[1] !== newRange[1]
+        ) {
+          return newRange;
+        }
+        return prevRange;
+      });
+    } else if (event['xaxis.autorange']) {
+      setXAxisRange(null);
+    }
+  };
 
   // Fetch weather data for selected city
   const weatherData = useWeatherData(
@@ -409,6 +445,7 @@ function CSVStatistics({ filename }: { filename: string }) {
               xaxis: {
                 title: 'Date/Time',
                 tickangle: -45,
+                ...(xAxisRange && { range: xAxisRange, autorange: false }),
               },
               yaxis: {
                 title: 'Price ($/kWh)',
@@ -417,6 +454,7 @@ function CSVStatistics({ filename }: { filename: string }) {
             }}
             style={{ width: '100%', height: '400px' }}
             config={{ responsive: true }}
+            onRelayout={handleRelayout}
           />
         </Stack>
       </Paper>
@@ -475,6 +513,7 @@ function CSVStatistics({ filename }: { filename: string }) {
                   xaxis: {
                     title: 'Date/Time',
                     tickangle: -45,
+                    ...(xAxisRange && { range: xAxisRange, autorange: false }),
                   },
                   yaxis: {
                     title: 'Temperature (°F)',
@@ -483,6 +522,7 @@ function CSVStatistics({ filename }: { filename: string }) {
                 }}
                 style={{ width: '100%', height: '400px' }}
                 config={{ responsive: true }}
+                onRelayout={handleRelayout}
               />
             )}
         </Stack>
