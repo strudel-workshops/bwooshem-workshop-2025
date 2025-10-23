@@ -236,6 +236,12 @@ function CSVStatistics({ filename }: { filename: string }) {
               <Typography fontWeight="bold">Minimum Price ($/kWh):</Typography>
               <Typography>${stats.min}</Typography>
             </Stack>
+            <Stack direction="row" justifyContent="space-between">
+              <Typography fontWeight="bold">
+                Average Daily Price Delta ($/kWh):
+              </Typography>
+              <Typography>${stats.averageDailyPriceDelta}</Typography>
+            </Stack>
           </Stack>
         </Stack>
       </Paper>
@@ -264,6 +270,9 @@ function CSVStatistics({ filename }: { filename: string }) {
                     <strong>Min ($/kWh)</strong>
                   </TableCell>
                   <TableCell align="right">
+                    <strong>Avg Daily Delta ($/kWh)</strong>
+                  </TableCell>
+                  <TableCell align="right">
                     <strong>Data Points</strong>
                   </TableCell>
                 </TableRow>
@@ -276,6 +285,9 @@ function CSVStatistics({ filename }: { filename: string }) {
                     <TableCell align="right">${monthStat.median}</TableCell>
                     <TableCell align="right">${monthStat.max}</TableCell>
                     <TableCell align="right">${monthStat.min}</TableCell>
+                    <TableCell align="right">
+                      ${monthStat.averageDailyPriceDelta}
+                    </TableCell>
                     <TableCell align="right">
                       {monthStat.count.toLocaleString()}
                     </TableCell>

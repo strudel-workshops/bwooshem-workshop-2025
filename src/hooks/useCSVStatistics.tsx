@@ -8,6 +8,7 @@ interface CSVStatistics {
   median: number;
   max: number;
   min: number;
+  averageDailyPriceDelta: number;
 }
 
 interface MonthlyStatistics {
@@ -17,6 +18,7 @@ interface MonthlyStatistics {
   max: number;
   min: number;
   count: number;
+  averageDailyPriceDelta: number;
 }
 
 interface HourlyProfile {
@@ -140,12 +142,36 @@ export function useCSVStatistics(filename: string): UseCSVStatisticsResult {
         const max = Math.max(...prices);
         const min = Math.min(...prices);
 
+        // Calculate average daily price delta
+        const dailyData: { [date: string]: number[] } = {};
+        dataPoints.forEach((point) => {
+          const dateStr = point.datetime.split(' ')[0]; // Extract date only
+          if (!dailyData[dateStr]) {
+            dailyData[dateStr] = [];
+          }
+          dailyData[dateStr].push(point.price);
+        });
+
+        const dailyDeltas = Object.values(dailyData).map((dayPrices) => {
+          const dayMax = Math.max(...dayPrices);
+          const dayMin = Math.min(...dayPrices);
+          return dayMax - dayMin;
+        });
+
+        const averageDailyPriceDelta =
+          dailyDeltas.length > 0
+            ? dailyDeltas.reduce((acc, val) => acc + val, 0) /
+              dailyDeltas.length
+            : 0;
+
         setStats({
           count,
           average: Math.round(average * 10000) / 10000, // Round to 4 decimal places
           median: Math.round(median * 10000) / 10000,
           max: Math.round(max * 10000) / 10000,
           min: Math.round(min * 10000) / 10000,
+          averageDailyPriceDelta:
+            Math.round(averageDailyPriceDelta * 10000) / 10000,
         });
 
         // Calculate monthly statistics
@@ -180,6 +206,33 @@ export function useCSVStatistics(filename: string): UseCSVStatisticsResult {
             const monthMax = Math.max(...monthPrices);
             const monthMin = Math.min(...monthPrices);
 
+            // Calculate average daily price delta for this month
+            const monthDailyData: { [date: string]: number[] } = {};
+            dataPoints.forEach((point) => {
+              const dateStr = point.datetime.split(' ')[0];
+              const pointYearMonth = dateStr.substring(0, 7);
+              if (pointYearMonth === yearMonth) {
+                if (!monthDailyData[dateStr]) {
+                  monthDailyData[dateStr] = [];
+                }
+                monthDailyData[dateStr].push(point.price);
+              }
+            });
+
+            const monthDailyDeltas = Object.values(monthDailyData).map(
+              (dayPrices) => {
+                const dayMax = Math.max(...dayPrices);
+                const dayMin = Math.min(...dayPrices);
+                return dayMax - dayMin;
+              }
+            );
+
+            const monthAverageDailyPriceDelta =
+              monthDailyDeltas.length > 0
+                ? monthDailyDeltas.reduce((acc, val) => acc + val, 0) /
+                  monthDailyDeltas.length
+                : 0;
+
             // Format month as "December 2024" for display
             const [year, month] = yearMonth.split('-');
             const monthNames = [
@@ -205,6 +258,8 @@ export function useCSVStatistics(filename: string): UseCSVStatisticsResult {
               max: Math.round(monthMax * 10000) / 10000,
               min: Math.round(monthMin * 10000) / 10000,
               count: monthCount,
+              averageDailyPriceDelta:
+                Math.round(monthAverageDailyPriceDelta * 10000) / 10000,
             };
           });
 
