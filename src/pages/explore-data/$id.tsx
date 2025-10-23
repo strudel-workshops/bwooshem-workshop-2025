@@ -70,11 +70,24 @@ function DataDetailPage() {
  * Component to load and display statistics for a CSV file
  */
 function CSVStatistics({ filename }: { filename: string }) {
-  const { stats, data, monthlyStats, hourlyProfile, loading, error } =
-    useCSVStatistics(filename);
+  const {
+    stats,
+    data,
+    monthlyStats,
+    hourlyProfile,
+    weekdayHourlyProfile,
+    weekendHourlyProfile,
+    monthlyHourlyProfiles,
+    loading,
+    error,
+  } = useCSVStatistics(filename);
   const [hourlyMetric, setHourlyMetric] = useState<'average' | 'median'>(
     'average'
   );
+  const [selectedMonth, setSelectedMonth] = useState<string>('all');
+  const [selectedDayType, setSelectedDayType] = useState<
+    'all' | 'weekday' | 'weekend'
+  >('all');
 
   if (!filename) {
     return (
@@ -192,33 +205,143 @@ function CSVStatistics({ filename }: { filename: string }) {
             direction="row"
             justifyContent="space-between"
             alignItems="center"
+            flexWrap="wrap"
+            gap={2}
           >
             <Typography variant="h6" fontWeight="bold">
               Typical Daily Profile
             </Typography>
-            <FormControl size="small" sx={{ minWidth: 120 }}>
-              <InputLabel id="hourly-metric-label">Metric</InputLabel>
-              <Select
-                labelId="hourly-metric-label"
-                id="hourly-metric-select"
-                value={hourlyMetric}
-                label="Metric"
-                onChange={(e) =>
-                  setHourlyMetric(e.target.value as 'average' | 'median')
-                }
-              >
-                <MenuItem value="average">Average</MenuItem>
-                <MenuItem value="median">Median</MenuItem>
-              </Select>
-            </FormControl>
+            <Stack direction="row" spacing={2} flexWrap="wrap">
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <InputLabel id="month-filter-label">Time Period</InputLabel>
+                <Select
+                  labelId="month-filter-label"
+                  id="month-filter-select"
+                  value={selectedMonth}
+                  label="Time Period"
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                >
+                  <MenuItem value="all">All Data</MenuItem>
+                  {monthlyHourlyProfiles.map((monthProfile) => (
+                    <MenuItem
+                      key={monthProfile.month}
+                      value={monthProfile.month}
+                    >
+                      {monthProfile.month}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <FormControl size="small" sx={{ minWidth: 120 }}>
+                <InputLabel id="day-type-label">Day Type</InputLabel>
+                <Select
+                  labelId="day-type-label"
+                  id="day-type-select"
+                  value={selectedDayType}
+                  label="Day Type"
+                  onChange={(e) =>
+                    setSelectedDayType(
+                      e.target.value as 'all' | 'weekday' | 'weekend'
+                    )
+                  }
+                >
+                  <MenuItem value="all">All Days</MenuItem>
+                  <MenuItem value="weekday">Weekday</MenuItem>
+                  <MenuItem value="weekend">Weekend</MenuItem>
+                </Select>
+              </FormControl>
+              <FormControl size="small" sx={{ minWidth: 120 }}>
+                <InputLabel id="hourly-metric-label">Metric</InputLabel>
+                <Select
+                  labelId="hourly-metric-label"
+                  id="hourly-metric-select"
+                  value={hourlyMetric}
+                  label="Metric"
+                  onChange={(e) =>
+                    setHourlyMetric(e.target.value as 'average' | 'median')
+                  }
+                >
+                  <MenuItem value="average">Average</MenuItem>
+                  <MenuItem value="median">Median</MenuItem>
+                </Select>
+              </FormControl>
+            </Stack>
           </Stack>
           <Plot
             data={[
               {
-                x: hourlyProfile.map((h) => h.hour),
-                y: hourlyProfile.map((h) =>
-                  hourlyMetric === 'average' ? h.averagePrice : h.medianPrice
-                ),
+                x: (() => {
+                  if (selectedMonth === 'all') {
+                    if (selectedDayType === 'weekday')
+                      return weekdayHourlyProfile.map((h) => h.hour);
+                    if (selectedDayType === 'weekend')
+                      return weekendHourlyProfile.map((h) => h.hour);
+                    return hourlyProfile.map((h) => h.hour);
+                  } else {
+                    const monthData = monthlyHourlyProfiles.find(
+                      (mp) => mp.month === selectedMonth
+                    );
+                    if (!monthData) return hourlyProfile.map((h) => h.hour);
+                    if (selectedDayType === 'weekday')
+                      return monthData.weekdayProfile.map((h) => h.hour);
+                    if (selectedDayType === 'weekend')
+                      return monthData.weekendProfile.map((h) => h.hour);
+                    return monthData.profile.map((h) => h.hour);
+                  }
+                })(),
+                y: (() => {
+                  if (selectedMonth === 'all') {
+                    if (selectedDayType === 'weekday') {
+                      return weekdayHourlyProfile.map((h) =>
+                        hourlyMetric === 'average'
+                          ? h.averagePrice
+                          : h.medianPrice
+                      );
+                    }
+                    if (selectedDayType === 'weekend') {
+                      return weekendHourlyProfile.map((h) =>
+                        hourlyMetric === 'average'
+                          ? h.averagePrice
+                          : h.medianPrice
+                      );
+                    }
+                    return hourlyProfile.map((h) =>
+                      hourlyMetric === 'average'
+                        ? h.averagePrice
+                        : h.medianPrice
+                    );
+                  } else {
+                    const monthData = monthlyHourlyProfiles.find(
+                      (mp) => mp.month === selectedMonth
+                    );
+                    if (!monthData) {
+                      return hourlyProfile.map((h) =>
+                        hourlyMetric === 'average'
+                          ? h.averagePrice
+                          : h.medianPrice
+                      );
+                    }
+                    if (selectedDayType === 'weekday') {
+                      return monthData.weekdayProfile.map((h) =>
+                        hourlyMetric === 'average'
+                          ? h.averagePrice
+                          : h.medianPrice
+                      );
+                    }
+                    if (selectedDayType === 'weekend') {
+                      return monthData.weekendProfile.map((h) =>
+                        hourlyMetric === 'average'
+                          ? h.averagePrice
+                          : h.medianPrice
+                      );
+                    }
+                    return monthData.profile.map((h) =>
+                      hourlyMetric === 'average'
+                        ? h.averagePrice
+                        : h.medianPrice
+                    );
+                  }
+                })(),
                 type: 'scatter',
                 mode: 'lines+markers',
                 name: `${hourlyMetric === 'average' ? 'Average' : 'Median'} Price`,

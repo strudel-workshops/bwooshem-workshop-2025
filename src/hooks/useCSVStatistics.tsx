@@ -25,6 +25,13 @@ interface HourlyProfile {
   medianPrice: number;
 }
 
+interface MonthlyHourlyProfile {
+  month: string;
+  profile: HourlyProfile[];
+  weekdayProfile: HourlyProfile[];
+  weekendProfile: HourlyProfile[];
+}
+
 interface CSVDataPoint {
   datetime: string;
   price: number;
@@ -35,6 +42,9 @@ interface UseCSVStatisticsResult {
   data: CSVDataPoint[];
   monthlyStats: MonthlyStatistics[];
   hourlyProfile: HourlyProfile[];
+  weekdayHourlyProfile: HourlyProfile[];
+  weekendHourlyProfile: HourlyProfile[];
+  monthlyHourlyProfiles: MonthlyHourlyProfile[];
   loading: boolean;
   error: string | null;
 }
@@ -47,6 +57,15 @@ export function useCSVStatistics(filename: string): UseCSVStatisticsResult {
   const [data, setData] = useState<CSVDataPoint[]>([]);
   const [monthlyStats, setMonthlyStats] = useState<MonthlyStatistics[]>([]);
   const [hourlyProfile, setHourlyProfile] = useState<HourlyProfile[]>([]);
+  const [weekdayHourlyProfile, setWeekdayHourlyProfile] = useState<
+    HourlyProfile[]
+  >([]);
+  const [weekendHourlyProfile, setWeekendHourlyProfile] = useState<
+    HourlyProfile[]
+  >([]);
+  const [monthlyHourlyProfiles, setMonthlyHourlyProfiles] = useState<
+    MonthlyHourlyProfile[]
+  >([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,6 +75,9 @@ export function useCSVStatistics(filename: string): UseCSVStatisticsResult {
       setData([]);
       setMonthlyStats([]);
       setHourlyProfile([]);
+      setWeekdayHourlyProfile([]);
+      setWeekendHourlyProfile([]);
+      setMonthlyHourlyProfiles([]);
       setLoading(false);
       setError(null);
       return;
@@ -188,8 +210,18 @@ export function useCSVStatistics(filename: string): UseCSVStatisticsResult {
 
         setMonthlyStats(monthlyStatsArray);
 
+        // Helper function to determine if a date is a weekday
+        const isWeekday = (datetimeStr: string): boolean => {
+          // Parse the full datetime string with timezone to get accurate day of week
+          const date = new Date(datetimeStr);
+          const dayOfWeek = date.getDay();
+          return dayOfWeek >= 1 && dayOfWeek <= 5; // Monday (1) to Friday (5)
+        };
+
         // Calculate hourly profile (average price for each hour of the day)
         const hourlyData: { [hour: number]: number[] } = {};
+        const weekdayHourlyData: { [hour: number]: number[] } = {};
+        const weekendHourlyData: { [hour: number]: number[] } = {};
 
         dataPoints.forEach((point) => {
           // Extract hour from datetime string (format: "2024-12-01 00:00:00-08:00")
@@ -200,6 +232,19 @@ export function useCSVStatistics(filename: string): UseCSVStatisticsResult {
             hourlyData[hour] = [];
           }
           hourlyData[hour].push(point.price);
+
+          // Also categorize by weekday/weekend
+          if (isWeekday(point.datetime)) {
+            if (!weekdayHourlyData[hour]) {
+              weekdayHourlyData[hour] = [];
+            }
+            weekdayHourlyData[hour].push(point.price);
+          } else {
+            if (!weekendHourlyData[hour]) {
+              weekendHourlyData[hour] = [];
+            }
+            weekendHourlyData[hour].push(point.price);
+          }
         });
 
         // Calculate average and median price for each hour
@@ -233,6 +278,233 @@ export function useCSVStatistics(filename: string): UseCSVStatisticsResult {
         );
 
         setHourlyProfile(hourlyProfileArray);
+
+        // Calculate weekday hourly profile
+        const weekdayHourlyProfileArray: HourlyProfile[] = Array.from(
+          { length: 24 },
+          (_, hour) => {
+            const hourPrices = weekdayHourlyData[hour] || [];
+            const averagePrice =
+              hourPrices.length > 0
+                ? hourPrices.reduce((acc, val) => acc + val, 0) /
+                  hourPrices.length
+                : 0;
+
+            let medianPrice = 0;
+            if (hourPrices.length > 0) {
+              const sortedHourPrices = [...hourPrices].sort((a, b) => a - b);
+              medianPrice =
+                hourPrices.length % 2 === 0
+                  ? (sortedHourPrices[hourPrices.length / 2 - 1] +
+                      sortedHourPrices[hourPrices.length / 2]) /
+                    2
+                  : sortedHourPrices[Math.floor(hourPrices.length / 2)];
+            }
+
+            return {
+              hour,
+              averagePrice: Math.round(averagePrice * 10000) / 10000,
+              medianPrice: Math.round(medianPrice * 10000) / 10000,
+            };
+          }
+        );
+
+        setWeekdayHourlyProfile(weekdayHourlyProfileArray);
+
+        // Calculate weekend hourly profile
+        const weekendHourlyProfileArray: HourlyProfile[] = Array.from(
+          { length: 24 },
+          (_, hour) => {
+            const hourPrices = weekendHourlyData[hour] || [];
+            const averagePrice =
+              hourPrices.length > 0
+                ? hourPrices.reduce((acc, val) => acc + val, 0) /
+                  hourPrices.length
+                : 0;
+
+            let medianPrice = 0;
+            if (hourPrices.length > 0) {
+              const sortedHourPrices = [...hourPrices].sort((a, b) => a - b);
+              medianPrice =
+                hourPrices.length % 2 === 0
+                  ? (sortedHourPrices[hourPrices.length / 2 - 1] +
+                      sortedHourPrices[hourPrices.length / 2]) /
+                    2
+                  : sortedHourPrices[Math.floor(hourPrices.length / 2)];
+            }
+
+            return {
+              hour,
+              averagePrice: Math.round(averagePrice * 10000) / 10000,
+              medianPrice: Math.round(medianPrice * 10000) / 10000,
+            };
+          }
+        );
+
+        setWeekendHourlyProfile(weekendHourlyProfileArray);
+
+        // Calculate hourly profiles for each month
+        const monthlyHourlyProfilesArray: MonthlyHourlyProfile[] = Object.keys(
+          monthlyData
+        )
+          .sort()
+          .map((yearMonth) => {
+            const monthDataPoints = dataPoints.filter((point) => {
+              const dateStr = point.datetime.split(' ')[0];
+              const pointYearMonth = dateStr.substring(0, 7);
+              return pointYearMonth === yearMonth;
+            });
+
+            // Calculate hourly profile for this month
+            const monthHourlyData: { [hour: number]: number[] } = {};
+            const monthWeekdayHourlyData: { [hour: number]: number[] } = {};
+            const monthWeekendHourlyData: { [hour: number]: number[] } = {};
+
+            monthDataPoints.forEach((point) => {
+              const timeStr = point.datetime.split(' ')[1];
+              const hour = parseInt(timeStr.split(':')[0], 10);
+
+              if (!monthHourlyData[hour]) {
+                monthHourlyData[hour] = [];
+              }
+              monthHourlyData[hour].push(point.price);
+
+              // Also categorize by weekday/weekend for this month
+              if (isWeekday(point.datetime)) {
+                if (!monthWeekdayHourlyData[hour]) {
+                  monthWeekdayHourlyData[hour] = [];
+                }
+                monthWeekdayHourlyData[hour].push(point.price);
+              } else {
+                if (!monthWeekendHourlyData[hour]) {
+                  monthWeekendHourlyData[hour] = [];
+                }
+                monthWeekendHourlyData[hour].push(point.price);
+              }
+            });
+
+            const monthHourlyProfile: HourlyProfile[] = Array.from(
+              { length: 24 },
+              (_, hour) => {
+                const hourPrices = monthHourlyData[hour] || [];
+                const averagePrice =
+                  hourPrices.length > 0
+                    ? hourPrices.reduce((acc, val) => acc + val, 0) /
+                      hourPrices.length
+                    : 0;
+
+                let medianPrice = 0;
+                if (hourPrices.length > 0) {
+                  const sortedHourPrices = [...hourPrices].sort(
+                    (a, b) => a - b
+                  );
+                  medianPrice =
+                    hourPrices.length % 2 === 0
+                      ? (sortedHourPrices[hourPrices.length / 2 - 1] +
+                          sortedHourPrices[hourPrices.length / 2]) /
+                        2
+                      : sortedHourPrices[Math.floor(hourPrices.length / 2)];
+                }
+
+                return {
+                  hour,
+                  averagePrice: Math.round(averagePrice * 10000) / 10000,
+                  medianPrice: Math.round(medianPrice * 10000) / 10000,
+                };
+              }
+            );
+
+            // Calculate weekday profile for this month
+            const monthWeekdayProfile: HourlyProfile[] = Array.from(
+              { length: 24 },
+              (_, hour) => {
+                const hourPrices = monthWeekdayHourlyData[hour] || [];
+                const averagePrice =
+                  hourPrices.length > 0
+                    ? hourPrices.reduce((acc, val) => acc + val, 0) /
+                      hourPrices.length
+                    : 0;
+
+                let medianPrice = 0;
+                if (hourPrices.length > 0) {
+                  const sortedHourPrices = [...hourPrices].sort(
+                    (a, b) => a - b
+                  );
+                  medianPrice =
+                    hourPrices.length % 2 === 0
+                      ? (sortedHourPrices[hourPrices.length / 2 - 1] +
+                          sortedHourPrices[hourPrices.length / 2]) /
+                        2
+                      : sortedHourPrices[Math.floor(hourPrices.length / 2)];
+                }
+
+                return {
+                  hour,
+                  averagePrice: Math.round(averagePrice * 10000) / 10000,
+                  medianPrice: Math.round(medianPrice * 10000) / 10000,
+                };
+              }
+            );
+
+            // Calculate weekend profile for this month
+            const monthWeekendProfile: HourlyProfile[] = Array.from(
+              { length: 24 },
+              (_, hour) => {
+                const hourPrices = monthWeekendHourlyData[hour] || [];
+                const averagePrice =
+                  hourPrices.length > 0
+                    ? hourPrices.reduce((acc, val) => acc + val, 0) /
+                      hourPrices.length
+                    : 0;
+
+                let medianPrice = 0;
+                if (hourPrices.length > 0) {
+                  const sortedHourPrices = [...hourPrices].sort(
+                    (a, b) => a - b
+                  );
+                  medianPrice =
+                    hourPrices.length % 2 === 0
+                      ? (sortedHourPrices[hourPrices.length / 2 - 1] +
+                          sortedHourPrices[hourPrices.length / 2]) /
+                        2
+                      : sortedHourPrices[Math.floor(hourPrices.length / 2)];
+                }
+
+                return {
+                  hour,
+                  averagePrice: Math.round(averagePrice * 10000) / 10000,
+                  medianPrice: Math.round(medianPrice * 10000) / 10000,
+                };
+              }
+            );
+
+            // Format month as "December 2024" for display
+            const [year, month] = yearMonth.split('-');
+            const monthNames = [
+              'January',
+              'February',
+              'March',
+              'April',
+              'May',
+              'June',
+              'July',
+              'August',
+              'September',
+              'October',
+              'November',
+              'December',
+            ];
+            const monthName = monthNames[parseInt(month, 10) - 1];
+
+            return {
+              month: `${monthName} ${year}`,
+              profile: monthHourlyProfile,
+              weekdayProfile: monthWeekdayProfile,
+              weekendProfile: monthWeekendProfile,
+            };
+          });
+
+        setMonthlyHourlyProfiles(monthlyHourlyProfilesArray);
       } catch (err) {
         setError(
           err instanceof Error ? err.message : 'Failed to load CSV data'
@@ -241,6 +513,9 @@ export function useCSVStatistics(filename: string): UseCSVStatisticsResult {
         setData([]);
         setMonthlyStats([]);
         setHourlyProfile([]);
+        setWeekdayHourlyProfile([]);
+        setWeekendHourlyProfile([]);
+        setMonthlyHourlyProfiles([]);
       } finally {
         setLoading(false);
       }
@@ -249,5 +524,15 @@ export function useCSVStatistics(filename: string): UseCSVStatisticsResult {
     loadCSVData();
   }, [filename]);
 
-  return { stats, data, monthlyStats, hourlyProfile, loading, error };
+  return {
+    stats,
+    data,
+    monthlyStats,
+    hourlyProfile,
+    weekdayHourlyProfile,
+    weekendHourlyProfile,
+    monthlyHourlyProfiles,
+    loading,
+    error,
+  };
 }
