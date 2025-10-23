@@ -103,6 +103,13 @@ function CSVStatistics({ filename }: { filename: string }) {
   >('all');
   const [selectedCity, setSelectedCity] = useState<string>('San Jose');
   const [xAxisRange, setXAxisRange] = useState<[string, string] | null>(null);
+  const [priceYAxisRange, setPriceYAxisRange] = useState<
+    [number, number] | null
+  >(null);
+  const [tempYAxisRange, setTempYAxisRange] = useState<[number, number] | null>(
+    null
+  );
+  const [revision, setRevision] = useState<number>(0);
 
   // Extract date range from CSV data
   const dateRange =
@@ -113,27 +120,53 @@ function CSVStatistics({ filename }: { filename: string }) {
         }
       : null;
 
-  // Handler for synchronized zoom/pan on time-series charts
-  const handleRelayout = (event: any) => {
+  // Separate handlers for each chart to preserve independent y-axis zooming
+  const handlePriceRelayout = (event: any) => {
+    // Handle x-axis changes (synchronize across charts)
     if (event['xaxis.range[0]'] && event['xaxis.range[1]']) {
-      const newRange: [string, string] = [
-        event['xaxis.range[0]'],
-        event['xaxis.range[1]'],
-      ];
-      // Only update if the range has actually changed to prevent unnecessary re-renders
-      setXAxisRange((prevRange) => {
-        if (
-          !prevRange ||
-          prevRange[0] !== newRange[0] ||
-          prevRange[1] !== newRange[1]
-        ) {
-          return newRange;
-        }
-        return prevRange;
-      });
+      setXAxisRange([event['xaxis.range[0]'], event['xaxis.range[1]']]);
     } else if (event['xaxis.autorange']) {
       setXAxisRange(null);
     }
+
+    // Handle y-axis changes (independent per chart)
+    if (event['yaxis.range[0]'] && event['yaxis.range[1]']) {
+      setPriceYAxisRange([event['yaxis.range[0]'], event['yaxis.range[1]']]);
+    } else if (event['yaxis.autorange']) {
+      setPriceYAxisRange(null);
+    }
+
+    // Handle double-click reset
+    if (event.autosize) {
+      setXAxisRange(null);
+      setPriceYAxisRange(null);
+    }
+
+    setRevision((prev) => prev + 1);
+  };
+
+  const handleTempRelayout = (event: any) => {
+    // Handle x-axis changes (synchronize across charts)
+    if (event['xaxis.range[0]'] && event['xaxis.range[1]']) {
+      setXAxisRange([event['xaxis.range[0]'], event['xaxis.range[1]']]);
+    } else if (event['xaxis.autorange']) {
+      setXAxisRange(null);
+    }
+
+    // Handle y-axis changes (independent per chart)
+    if (event['yaxis.range[0]'] && event['yaxis.range[1]']) {
+      setTempYAxisRange([event['yaxis.range[0]'], event['yaxis.range[1]']]);
+    } else if (event['yaxis.autorange']) {
+      setTempYAxisRange(null);
+    }
+
+    // Handle double-click reset
+    if (event.autosize) {
+      setXAxisRange(null);
+      setTempYAxisRange(null);
+    }
+
+    setRevision((prev) => prev + 1);
   };
 
   // Fetch weather data for selected city
@@ -449,12 +482,17 @@ function CSVStatistics({ filename }: { filename: string }) {
               },
               yaxis: {
                 title: 'Price ($/kWh)',
+                ...(priceYAxisRange && {
+                  range: priceYAxisRange,
+                  autorange: false,
+                }),
               },
               showlegend: false,
             }}
+            revision={revision}
             style={{ width: '100%', height: '400px' }}
             config={{ responsive: true }}
-            onRelayout={handleRelayout}
+            onRelayout={handlePriceRelayout}
           />
         </Stack>
       </Paper>
@@ -517,12 +555,17 @@ function CSVStatistics({ filename }: { filename: string }) {
                   },
                   yaxis: {
                     title: 'Temperature (°F)',
+                    ...(tempYAxisRange && {
+                      range: tempYAxisRange,
+                      autorange: false,
+                    }),
                   },
                   showlegend: false,
                 }}
+                revision={revision}
                 style={{ width: '100%', height: '400px' }}
                 config={{ responsive: true }}
-                onRelayout={handleRelayout}
+                onRelayout={handleTempRelayout}
               />
             )}
         </Stack>
