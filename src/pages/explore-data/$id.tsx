@@ -20,6 +20,7 @@ import {
 import { PageHeader } from '../../components/PageHeader';
 import { useDetailQuery } from '../../hooks/useDetailQuery';
 import { useCSVStatistics } from '../../hooks/useCSVStatistics';
+import { useWeatherData } from '../../hooks/useWeatherData';
 import Plot from 'react-plotly.js';
 
 export const Route = createFileRoute('/explore-data/$id')({
@@ -88,6 +89,23 @@ function CSVStatistics({ filename }: { filename: string }) {
   const [selectedDayType, setSelectedDayType] = useState<
     'all' | 'weekday' | 'weekend'
   >('all');
+  const [selectedCity, setSelectedCity] = useState<string>('San Jose');
+
+  // Extract date range from CSV data
+  const dateRange =
+    data.length > 0
+      ? {
+          startDate: data[0].datetime.split(' ')[0],
+          endDate: data[data.length - 1].datetime.split(' ')[0],
+        }
+      : null;
+
+  // Fetch weather data for selected city
+  const weatherData = useWeatherData(
+    selectedCity,
+    dateRange?.startDate || null,
+    dateRange?.endDate || null
+  );
 
   if (!filename) {
     return (
@@ -400,6 +418,73 @@ function CSVStatistics({ filename }: { filename: string }) {
             style={{ width: '100%', height: '400px' }}
             config={{ responsive: true }}
           />
+        </Stack>
+      </Paper>
+      <Paper sx={{ padding: 2 }}>
+        <Stack spacing={2}>
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
+            flexWrap="wrap"
+            gap={2}
+          >
+            <Typography variant="h6" fontWeight="bold">
+              Outdoor Air Temperature
+            </Typography>
+            <FormControl size="small" sx={{ minWidth: 150 }}>
+              <InputLabel id="city-select-label">City</InputLabel>
+              <Select
+                labelId="city-select-label"
+                id="city-select"
+                value={selectedCity}
+                label="City"
+                onChange={(e) => setSelectedCity(e.target.value)}
+              >
+                <MenuItem value="San Jose">San Jose, CA</MenuItem>
+                <MenuItem value="Berkeley">Berkeley, CA</MenuItem>
+                <MenuItem value="Sacramento">Sacramento, CA</MenuItem>
+              </Select>
+            </FormControl>
+          </Stack>
+          {weatherData.loading && (
+            <Typography>Loading temperature data...</Typography>
+          )}
+          {weatherData.error && (
+            <Typography color="error">
+              Error loading temperature: {weatherData.error}
+            </Typography>
+          )}
+          {!weatherData.loading &&
+            !weatherData.error &&
+            weatherData.data.length > 0 && (
+              <Plot
+                data={[
+                  {
+                    x: weatherData.data.map((d) => d.datetime),
+                    y: weatherData.data.map((d) => d.temperature),
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Temperature (°F)',
+                    line: { color: '#d32f2f' },
+                  },
+                ]}
+                layout={{
+                  autosize: true,
+                  margin: { l: 60, r: 40, t: 20, b: 80 },
+                  xaxis: {
+                    title: 'Date/Time',
+                    tickangle: -45,
+                  },
+                  yaxis: {
+                    title: 'Temperature (°F)',
+                  },
+                  showlegend: false,
+                }}
+                style={{ width: '100%', height: '400px' }}
+                config={{ responsive: true }}
+              />
+            )}
         </Stack>
       </Paper>
     </Stack>
